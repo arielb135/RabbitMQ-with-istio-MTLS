@@ -8,7 +8,96 @@ There were several workarounds that were suggested, and in this respository i'll
 
 > note - This chart was not tested with whole combinations, use with cation.
 
-The deployment had 3 main issues i've encountered:
+A typical deployment of this chart can look like this:
+![istio](https://github.com/arielb135/RabbitMQ-with-istio-MTLS/blob/master/sketches/istio.png)
+1. the istio gateway exposes the UI
+2. the "unknown" is another load balancer that exposes only the AMQPS port in case of rabbit implemented MTLS (this should be fixed, not in scope)
+3. the handler is a java app that access rabbit in AMQP port (using istio MTLS)
+
+> this dashboard came from kiali, which should be enabled when installing istio, more info: https://istio.io/docs/tasks/telemetry/kiali/
+
+## Installing ISTIO
+Istio is pretty easy to install, i've used istio 1.0 and followed the following tutorial, while enabling auto sidecar injection:
+* https://istio.io/docs/setup/kubernetes/install/helm/
+* https://istio.io/docs/setup/kubernetes/additional-setup/sidecar-injection/#automatic-sidecar-injection
+
+## Labeling namespaces for injection
+We will want that the istio sidecar will be injected automatically to rabbitMQ namespace (rabbitns let's say) - so we need to label that namespace (after creating it) to allow it:
+```bash
+$ kubectl create ns rabbitns
+```
+Then we will label this namespace so all pods will automatically have the istio sidecar container:
+```bash
+$ kubectl label namespace rabbitns istio-injection=enabled
+```
+
+## Values.yaml istio support
+The part of the yaml that supports istio is this:
+``` yaml
+istio:
+  enabled: true
+  mtls: true
+  ingress:
+    enabled: true
+    managementHostName: rabbit.mycooldomain.com
+```
+* ingress part defines a record in the ingress gateway
+## Exposing rabbitMQ UI in the ingress gateway
+Thankfully, istio gave us an istio gateway that can be used as the entry point if we want to go inside the cluster, we can terminate TLS there (to the outside world) for example.
+
+``` yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.12.1
+    heritage: Tiller
+    release: rabbitmq
+  name: rabbitmq-gw
+  namespace: rabbitns
+spec:
+  selector:
+    istio: ingressgateway # use default istio gateway
+  servers:
+  - hosts:
+    - rabbit.mycooldomain.com
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+```
+* This tells the istio gateway to do something with traffic that comes with the host rabbit.mycooldomain.com on port 80.
+
+To actually perform the routing to the service, we must use a VirtualService to do so:
+``` yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.12.1
+    heritage: Tiller
+    release: rabbitmq
+  name: rabbitmq-vs
+  namespace: rabbitns
+spec:
+  gateways:
+  - rabbitmq-gw
+  hosts:
+  - rabbit.mycooldomain.com
+  http:
+  - route:
+    - destination:
+        host: rabbitmq-internal.rabbitns.svc.cluster.local
+        port:
+          number: 15672 # rabbitmq management UI port
+```
+* In here we're telling to rabbit.mycooldomain.com to go to the internal service rabbitmq-internal.rabbitns.svc.cluster.local (which exposes the rabbit UI) with port 15672 (management UI).
+
+![istio](https://github.com/arielb135/RabbitMQ-with-istio-MTLS/blob/master/sketches/ui.png)
+
+The istio objects that were created come to respond to 3 main issues - 
 ## Issue 1 - Stateful sets pod discovery
 Usually when creating a a deployment - we have multiple stateless service that are independent from each other.
 Stateful apps such as databases, rabbit are participating in a cluster, which means they require stable DNS of each pod so they can exchange information between them, This is not possible in a regular deployment, as the DNS is not stable (nor the IPs).
@@ -149,7 +238,7 @@ metadata:
     chart: rabbitmq-ha-1.12.1
     heritage: Tiller
     release: rabbitmq
-  name: carabbitmq-dr
+  name: rabbitmq-dr
   namespace: rabbitns
 spec:
   host: '*.rabbitns.svc.cluster.local'
@@ -172,7 +261,7 @@ metadata:
     chart: rabbitmq-ha-1.12.1
     heritage: Tiller
     release: rabbitmq
-  name: carabbitmq-dr
+  name: java-dr
   namespace: javarabbitclient
 spec:
   host: '*.rabbitns.svc.cluster.local'
@@ -226,3 +315,19 @@ spec:
     app: rabbitmq-ha
     release: rabbitmq
 ```
+
+## Verifying TLS
+taken from here: https://istio.io/docs/tasks/security/mutual-tls/#verify-mutual-tls-configuration
+
+we will use the istioctl tool, with the tls-check option,
+``` bash
+$ istioctl authn tls-check handler-6f936c59f5-4d88d.javarabbitclient rabbitmq-internal.rabbitns.svc.cluster.local
+```
+* This checks the tls of the handler pod (our java service) dot namespace ({pod}.{namespace}) to the service it requests (which is actually the rabbitmq-internal internal service that is exposed in the rabbit namespace)
+
+we can now see the output:
+``` bash
+HOST:PORT                                             STATUS     SERVER     CLIENT     AUTHN POLICY         DESTINATION RULE
+rabbitmq-internal.rabbitns.svc.cluster.local:5671     OK         mTLS       mTLS       default/rabbitmq     java-dr/javaservice
+```
+which means both Server (policy) and Client (destination rule) are configured for mTLS for the 5671 port.
