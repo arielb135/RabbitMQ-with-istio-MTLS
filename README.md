@@ -317,7 +317,7 @@ metadata:
   name: rabbitmq-mtls-internal
   namespace: rabbitns
 spec:
-  host: 'rabbitmq-discovery.rabbitns.svc.cluster.local'
+  host: 'rabbitmq-internal.rabbitns.svc.cluster.local'
   trafficPolicy:
     portLevelSettings:
     - port:
