@@ -229,7 +229,12 @@ spec:
 * In here, we are addressing 3 services - the first is the headless service, which we want to exclude the epmd port and also the amqps (probably unecessary). The second is the regular service, that in this chart we expose it via load balancer for example, so we want to omit MTLS from it, third one is the internal service - which we also want to exclude 5671 mtls port.
 * Now we have the entire rabbitMQ services require MTLS to work - excluding 4369 and 5671
 
-To configure the "client" (the rabbitMQ pods themselves so they can initiate MTLS connection as a "client") - we need to set the destination rule:
+To configure the "client" (the rabbitMQ pods themselves so they can initiate MTLS connection as a "client") - we need to create several destination rules - this is a bit tricky.
+The deployment is divided to 4 destination rules (the "clients"), to avoid conflicts in cluster (even if some of the ports are not used in some services)
+* Per pod - ***.rabbitmq-discovery.rabbitns.svc.cluster.local** - which sets a full MTLS for all ports (for the client side)
+* exposed through ingress service - **rabbitmq.rabbitns.svc.cluster.local** - full MTLS except amqps port (5671)
+* headless service - **rabbitmq-discovery.rabbitns.svc.cluster.local** - full MTLS except amqps port (5671) and epmd port (4369)
+* internal service - **rabbitmq-internal.rabbitns.svc.cluster.local** - full MTLS except amqps port (5671)
 ``` yaml
 apiVersion: v1
 items:
@@ -241,10 +246,51 @@ metadata:
     chart: rabbitmq-ha-1.12.1
     heritage: Tiller
     release: rabbitmq
-  name: rabbitmq-dr
+  name: rabbitmq-mtls-per-pod
   namespace: rabbitns
 spec:
-  host: '*.rabbitns.svc.cluster.local'
+  host: '*.rabbitmq-discovery.rabbitns.svc.cluster.local'
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: v1
+items:
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.12.1
+    heritage: Tiller
+    release: rabbitmq
+  name: rabbitmq-mtls
+  namespace: rabbitns
+spec:
+  host: 'rabbitmq.rabbitns.svc.cluster.local'
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 5671
+      tls:
+        mode: DISABLE
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: v1
+items:
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.12.1
+    heritage: Tiller
+    release: rabbitmq
+  name: rabbitmq-mtls
+  namespace: rabbitns
+spec:
+  host: 'rabbitmq-discovery.rabbitns.svc.cluster.local'
   trafficPolicy:
     portLevelSettings:
     - port:
@@ -257,14 +303,38 @@ spec:
         mode: DISABLE
     tls:
       mode: ISTIO_MUTUAL
+---
+apiVersion: v1
+items:
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.12.1
+    heritage: Tiller
+    release: rabbitmq
+  name: rabbitmq-mtls-internal
+  namespace: rabbitns
+spec:
+  host: 'rabbitmq-discovery.rabbitns.svc.cluster.local'
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 5671
+      tls:
+        mode: DISABLE
+    tls:
+      mode: ISTIO_MUTUAL
 ```
-* The above means that we would like a mutual TLS for everything that is directed to "*.rabbitns.svc.cluster.local".
-* We want to avoid conflicts, so we will disable the 2 ports that will not be used for MTLS
-** 4369 is not really necessary as other services don't need to communicate with this port, but i'm adding it for a cleaner cluster (so there won't be conflicts in the service mesh records)
+* The above means that we would like a mutual TLS for everything that is directed to either the pod themselves, or 
+* We want to avoid conflicts, so we will disable ports that don't require MTLS for each service / host.
 ** 5671 is the AMQPS port - which we want the client to use it regulary.
 * Because we deployed it in the rabbitns namespace, it will apply to whole "clients" of that namespace.
 
-If we'll have another rabbit client in another namespace (let's say javarabbitclient), we would create the same rule, but in that specific namespace:
+> Note - it's ok to create one destination rule that catchs all ***.rabbitns.svc.cluster.local**, but you will have conflicts when checking tls settings - this might be ok even in istio strict TLS mode - but requires more testing
+
+If we'll have another rabbit client in another namespace (let's say javarabbitclient), we would create the a simpler rule for the internal service , but in that specific namespace:
 ``` yaml
 apiVersion: v1
 items:
@@ -279,13 +349,9 @@ metadata:
   name: java-dr
   namespace: javarabbitclient
 spec:
-  host: '*.rabbitns.svc.cluster.local'
+  host: 'rabbitmq-internal.rabbitns.svc.cluster.local'
   trafficPolicy:
     portLevelSettings:
-    - port:
-        number: 4369
-      tls:
-        mode: DISABLE
     - port:
         number: 5671
       tls:
@@ -296,7 +362,7 @@ spec:
 
 This sketch illustrates what happens:
 ![TLS](https://github.com/arielb135/RabbitMQ-with-istio-MTLS/blob/master/sketches/tls.png)
-* The destination rule is deployed in the client's namespace, and directs that it wants to talk as MTLS to the host *.rabbitns.svc.cluster.local
+* The destination rule is deployed in the client's namespace, and directs that it wants to talk as MTLS to the service rabbitmq-internal.rabbitns.svc.cluster.local
 * The policy says to enable MTLS for the whole namespace, but exclude certain ports
 
 ## Issue 3 - Headless service DNS entry cannot participate in MTLS
