@@ -99,7 +99,7 @@ spec:
 
 The istio objects that were created come to respond to 3 main issues - 
 ## Issue 1 - Stateful sets pod discovery
-Usually when creating a a deployment - we have multiple stateless service that are independent from each other.
+Usually when creating a deployment - we have multiple stateless service that are independent from each other.
 Stateful apps such as databases, rabbit are participating in a cluster, which means they require stable DNS of each pod so they can exchange information between them, This is not possible in a regular deployment, as the DNS is not stable (nor the IPs).
 this presents us with the "stateful set" option - which assures:
 
@@ -278,9 +278,9 @@ This sketch illustrates what happens:
 ## Issue 3 - Headless service DNS entry cannot participate in MTLS
 
 ### Issue
-Headless service is the service that gives the pods their IP.
+Headless service is the service that gives the pods their stable DNS record.
 
-as kubernetes gives the headless service also a full DNS name (like regular service) - it's not a good idea to use that DNS to talk inside the cluster anyway, as it used for distribution of DNS entries to per-pode.
+as kubernetes gives the headless service also a full DNS name (like regular service), which can be used as a round robin style aswell. - it's not a good idea to use that DNS to talk inside the cluster anyway, as it used for distribution of DNS entries to per-pod, and for good order - it's recommended to create a seperate internal service for internal communication.
 
 ### Workaround
 Create another service without a type (clusterIP), which will not attach it to any load balancer - and you'll have a internal service that we can use (with the DNS - rabbitmq-internal.rabbitns.svc.cluster.local)
