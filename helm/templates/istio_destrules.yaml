@@ -1,0 +1,99 @@
+{{- if and .Values.istio.enabled .Values.istio.mtls }}
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-mtls-per-pod
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  host: "*.{{ template "rabbitmq-ha.fullname" . }}-discovery.{{ .Release.Namespace }}.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-mtls-discovery
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  host: "{{ template "rabbitmq-ha.fullname" . }}-discovery.{{ .Release.Namespace }}.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    portLevelSettings: #Disable client TLS requirements for EPMD port and optionally amqps port
+    - port:
+        number: {{ .Values.Epmd.rabbitmqEpmdPort }}
+      tls:
+        mode: DISABLE
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - port:
+        number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+      tls:
+        mode: DISABLE
+{{- end }}
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-mtls
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  host: "{{ template "rabbitmq-ha.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    portLevelSettings: #Disable client TLS requirements for EPMD port and optionally amqps port
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - port:
+        number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+      tls:
+        mode: DISABLE
+{{- end }}
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-mtls-internal
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  host: "{{ template "rabbitmq-ha.fullname" . }}-internal.{{ .Release.Namespace }}.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    portLevelSettings: #Disable client TLS requirements for EPMD port and optionally amqps port
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - port:
+        number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+      tls:
+        mode: DISABLE
+{{- end }}
+{{- end }}
+	

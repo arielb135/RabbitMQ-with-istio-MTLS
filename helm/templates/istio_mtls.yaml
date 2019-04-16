@@ -1,0 +1,49 @@
+{{- if and .Values.istio.enabled .Values.istio.mtls }}
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "default"
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}  
+spec:
+  peers:
+  - mtls: {}
+---
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-disable-mtls
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  targets:
+  - name: {{ template "rabbitmq-ha.fullname" . }}-discovery
+    ports:
+    - number: {{ .Values.Epmd.rabbitmqEpmdPort }}
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+{{- end }}
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+  - name: {{ template "rabbitmq-ha.fullname" . }}
+    ports:
+    - number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+{{- end }}
+{{- if .Values.rabbitmqAmqpsSupport.enabled }}
+  - name: {{ template "rabbitmq-ha.fullname" . }}-internal
+    ports:
+    - number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+{{- end }}
+
+{{- end }}

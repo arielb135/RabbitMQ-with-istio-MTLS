@@ -1,0 +1,72 @@
+{{- if .Values.istio.enabled }}
+{{- $fullName := (include "rabbitmq-ha.fullname" .) }}
+{{- $namespace := .Release.Namespace }}
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  hosts:
+{{- range $counter, $e := untilStep 0 (.Values.replicaCount|int) 1 }}
+  - {{ $fullName }}-{{ $counter }}.{{ $fullName }}-discovery.{{ $namespace }}.svc.cluster.local
+{{- end }}
+  location: MESH_INTERNAL
+  ports:
+  - name: http
+    protocol: TCP
+    number: {{ .Values.rabbitmqManagerPort }}      
+  - name: amqp
+    protocol: TCP
+    number: {{ .Values.rabbitmqNodePort }}
+  - name: epmd
+    protocol: TCP
+    number: {{ .Values.Epmd.rabbitmqEpmdPort }}
+  {{- if .Values.rabbitmqSTOMPPlugin.enabled }}
+  - name: stomp-tcp
+    protocol: TCP
+    number: 61613
+  - name: stomp-ssl
+    protocol: TCP
+    number: 61614
+  {{- end }}
+  {{- if .Values.rabbitmqWebSTOMPPlugin.enabled }}
+  - name: stomp-ws
+    protocol: TCP
+    number: 15674
+  {{- end }}
+  {{- if .Values.rabbitmqMQTTPlugin.enabled }}
+  - name: mqtt-tcp
+    protocol: TCP
+    number: 1883
+  - name: mqtt-ssl
+    protocol: TCP
+    number: 8883
+  {{- end }}
+  {{- if .Values.rabbitmqWebMQTTPlugin.enabled }}
+  - name: mqtt-ws
+    protocol: TCP
+    number: 15675
+  {{- end }}
+  {{- if .Values.rabbitmqAmqpsSupport.enabled }}
+  - name: amqps
+    protocol: TCP
+    number: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+  {{- end }}
+  {{ if .Values.prometheus.exporter.enabled }}
+  - name: exporter
+    protocol: TCP
+    number: {{ .Values.prometheus.exporter.port }}
+  {{ end }}
+  - name: inter-node
+    protocol: TCP
+    number: 25672
+  resolution: NONE
+{{- end }}

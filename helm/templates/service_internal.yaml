@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-internal
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- if .Values.extraLabels }}
+{{ toYaml .Values.extraLabels | indent 4 }}
+{{- end }}
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.rabbitmqManagerPort }}
+      targetPort: http
+    - name: amqp
+      protocol: TCP
+      port: {{ .Values.rabbitmqNodePort }}
+      targetPort: amqp
+    {{- if .Values.Epmd.shouldExportEpmdPort }}
+    - name: epmd
+      protocol: TCP
+      port: {{ .Values.Epmd.rabbitmqEpmdPort }}
+      targetPort: epmd
+    {{- end }}
+    {{- if .Values.rabbitmqSTOMPPlugin.enabled }}
+    - name: stomp-tcp
+      protocol: TCP
+      port: 61613
+      targetPort: stomp-tcp
+    - name: stomp-ssl
+      protocol: TCP
+      port: 61614
+      targetPort: stomp-ssl
+    {{- end }}
+    {{- if .Values.rabbitmqWebSTOMPPlugin.enabled }}
+    - name: stomp-ws
+      protocol: TCP
+      port: 15674
+      targetPort: stomp-ws
+    {{- end }}
+    {{- if .Values.rabbitmqMQTTPlugin.enabled }}
+    - name: mqtt-tcp
+      protocol: TCP
+      port: 1883
+      targetPort: mqtt-tcp
+    - name: mqtt-ssl
+      protocol: TCP
+      port: 8883
+      targetPort: mqtt-ssl
+    {{- end }}
+    {{- if .Values.rabbitmqWebMQTTPlugin.enabled }}
+    - name: mqtt-ws
+      protocol: TCP
+      port: 15675
+      targetPort: mqtt-ws
+    {{- end }}
+    {{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - name: amqps
+      protocol: TCP
+      port: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+      targetPort: amqps
+    {{- end }}
+    {{ if .Values.prometheus.exporter.enabled }}
+    - name: exporter
+      protocol: TCP
+      port: {{ .Values.prometheus.exporter.port }}
+      targetPort: exporter
+    {{ end }}
+  selector:
+    app: {{ template "rabbitmq-ha.name" . }}
+    release: {{ .Release.Name }}
