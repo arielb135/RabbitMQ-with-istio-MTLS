@@ -1,6 +1,6 @@
 # RabbitMQ-with-istio-MTLS
 RabbitMQ stateful deployment with istio service mesh, and with MTLS enabled.
-This repository is a clone of https://github.com/helm/charts/tree/master/stable/rabbitmq with an istio MTLS integration.
+This repository is a clone of https://github.com/helm/charts/tree/master/stable/rabbitmq-ha with an istio MTLS integration.
 
 ## Introduction
 Istio (atleast 1.0) does not support fully stateful set deployments - which is discussed in many threads around the web.
