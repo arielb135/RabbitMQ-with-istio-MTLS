@@ -182,7 +182,8 @@ To workaround this, we have 2 options:
 
 so in rabbitMQ you have to exclude this port (thus, service discovery will not be done encrypted) - always consult with security architect / anyone else to see what it means to the deployment.
 
-This is done aswell by the policy object, we can see an example:
+**Policy:**
+This is done aswell by the policy object, we can see an example
 ``` yaml
 apiVersion: authentication.istio.io/v1alpha1
 kind: Policy
@@ -229,6 +230,9 @@ spec:
 * In here, we are addressing 3 services - the first is the headless service, which we want to exclude the epmd port and also the amqps (probably unecessary). The second is the regular service, that in this chart we expose it via load balancer for example, so we want to omit MTLS from it, third one is the internal service - which we also want to exclude 5671 mtls port.
 * Now we have the entire rabbitMQ services require MTLS to work - excluding 4369 and 5671
 
+> Important - there can be only one per namespace policy - we are utilizing it in this chart, meaning - you should deploy rabbit in its own namespace to avoid problems - https://istio.io/docs/concepts/security/#target-selectors
+
+**Destination Rule:**
 To configure the "client" (the rabbitMQ pods themselves so they can initiate MTLS connection as a "client") - we need to create several destination rules - this is a bit tricky.
 The deployment is divided to 4 destination rules (the "clients"), to avoid conflicts in cluster (even if some of the ports are not used in some services)
 * Per pod - ***.rabbitmq-discovery.rabbitns.svc.cluster.local** - which sets a full MTLS for all ports (for the client side)
@@ -428,3 +432,32 @@ We can see several interesting entries here:
 * Port 5672 - regular unencrypted AMQP port - will now be encrypted under istio mTLS
 * Port 9419 - is for metrics scraping (Note - this was not tested if it works, so prometheus integration and istio configuration is out of scope for this charts)
 * Port 15672 - the management UI
+
+## Unrelated chart features
+### Reoccuring definitions
+There's an ability to add reoccuring entries to definitions.json with "definitions_reoccuring":
+``` yaml
+definitions_reoccuring:
+  enabled: true
+  replaceString: "#"
+  startFrom: 101
+  until: 120
+## Must be string values ( e.g. ["102", "103"]
+  skipIndexes: ["110"] 
+  users: |-
+    {
+      "name": "user#",
+      "tags": ""
+    }
+  permissions: |-
+    {
+      "user": "user#",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+```
+In the above we will create 19 users (from 101 to 120, excluding 110) that are called user user101, user102 etc...
+There's the exclusion field to skip some users.
+This supports any entry in definitions.json - and the string to replace with number is #
