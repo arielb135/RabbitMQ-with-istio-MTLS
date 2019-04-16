@@ -128,7 +128,7 @@ metadata:
     chart: rabbitmq-ha-1.12.1
     heritage: Tiller
     release: rabbitmq
-  name: carabbitmq
+  name: rabbitmq
   namespace: rabbitns
 spec:
   hosts:
@@ -213,7 +213,7 @@ metadata:
     chart: rabbitmq-ha-1.12.1
     heritage: Tiller
     release: rabbitmq
-  name: carabbitmq-disable-mtls
+  name: rabbitmq-disable-mtls
   namespace: rabbitns
 spec:
   targets:
@@ -224,7 +224,7 @@ spec:
   - name: rabbitmq
     ports:
     - number: 5671
-  - name: carabbitmq-internal
+  - name: rabbitmq-internal
     ports:
     - number: 5671
 ```
