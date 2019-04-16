@@ -321,13 +321,16 @@ taken from here: https://istio.io/docs/tasks/security/mutual-tls/#verify-mutual-
 
 we will use the istioctl tool, with the tls-check option,
 ``` bash
-$ istioctl authn tls-check handler-6f936c59f5-4d88d.javarabbitclient rabbitmq-internal.rabbitns.svc.cluster.local
+$ istioctl authn tls-check handler-6f936c59f5-4d88d.javarabbitclient
 ```
-* This checks the tls of the handler pod (our java service) dot namespace ({pod}.{namespace}) to the service it requests (which is actually the rabbitmq-internal internal service that is exposed in the rabbit namespace)
+* This checks the tls of the handler pod (our java service) dot namespace ({pod}.{namespace}) in the mesh. as we're using the rabbitmq-internal - we can look at the entries of it:
 
 we can now see the output:
 ``` bash
-HOST:PORT                                             STATUS     SERVER     CLIENT     AUTHN POLICY         DESTINATION RULE
-rabbitmq-internal.rabbitns.svc.cluster.local:5671     OK         mTLS       mTLS       default/rabbitmq     java-dr/javaservice
+HOST:PORT                                             STATUS     SERVER     CLIENT     AUTHN POLICY                   DESTINATION RULE
+rabbitmq-internal.rabbitns.svc.cluster.local:5671     OK         HTTP       HTTP       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:5672     OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:9419     OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:15672    OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
 ```
 which means both Server (policy) and Client (destination rule) are configured for mTLS for the 5671 port.
