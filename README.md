@@ -222,8 +222,11 @@ spec:
   - name: rabbitmq
     ports:
     - number: 5671
+  - name: carabbitmq-internal
+    ports:
+    - number: 5671
 ```
-* In here, we are addressing 2 services - the first is the headless service, which we want to exclude the epmd port and also the amqps (probably unecessary). The second is the regular service, that in this chart we expose it via load balancer for example, so we want to omit MTLS from it.
+* In here, we are addressing 3 services - the first is the headless service, which we want to exclude the epmd port and also the amqps (probably unecessary). The second is the regular service, that in this chart we expose it via load balancer for example, so we want to omit MTLS from it, third one is the internal service - which we also want to exclude 5671 mtls port.
 * Now we have the entire rabbitMQ services require MTLS to work - excluding 4369 and 5671
 
 To configure the "client" (the rabbitMQ pods themselves so they can initiate MTLS connection as a "client") - we need to set the destination rule:
@@ -243,10 +246,22 @@ metadata:
 spec:
   host: '*.rabbitns.svc.cluster.local'
   trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 4369
+      tls:
+        mode: DISABLE
+    - port:
+        number: 5671
+      tls:
+        mode: DISABLE
     tls:
       mode: ISTIO_MUTUAL
 ```
 * The above means that we would like a mutual TLS for everything that is directed to "*.rabbitns.svc.cluster.local".
+* We want to avoid conflicts, so we will disable the 2 ports that will not be used for MTLS
+** 4369 is not really necessary as other services don't need to communicate with this port, but i'm adding it for a cleaner cluster (so there won't be conflicts in the service mesh records)
+** 5671 is the AMQPS port - which we want the client to use it regulary.
 * Because we deployed it in the rabbitns namespace, it will apply to whole "clients" of that namespace.
 
 If we'll have another rabbit client in another namespace (let's say javarabbitclient), we would create the same rule, but in that specific namespace:
@@ -266,6 +281,15 @@ metadata:
 spec:
   host: '*.rabbitns.svc.cluster.local'
   trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 4369
+      tls:
+        mode: DISABLE
+    - port:
+        number: 5671
+      tls:
+        mode: DISABLE
     tls:
       mode: ISTIO_MUTUAL
 ```
@@ -333,4 +357,8 @@ rabbitmq-internal.rabbitns.svc.cluster.local:5672     OK         mTLS       mTLS
 rabbitmq-internal.rabbitns.svc.cluster.local:9419     OK         mTLS       mTLS       default/rabbitns               handler/javarabbitclient
 rabbitmq-internal.rabbitns.svc.cluster.local:15672    OK         mTLS       mTLS       default/rabbitns               handler/javarabbitclient
 ```
-which means both Server (policy) and Client (destination rule) are configured for mTLS for the 5671 port.
+We can see several interesting entries here:
+* Port 5671 - which is the secured AMQPS port that we decided to exclude from MTLS communication
+* Port 5672 - regular unencrypted AMQP port - will now be encrypted under istio mTLS
+* Port 9419 - is for metrics scraping (Note - this was not tested if it works, so prometheus integration and istio configuration is out of scope for this charts)
+* Port 15672 - the management UI
