@@ -329,8 +329,8 @@ we can now see the output:
 ``` bash
 HOST:PORT                                             STATUS     SERVER     CLIENT     AUTHN POLICY                   DESTINATION RULE
 rabbitmq-internal.rabbitns.svc.cluster.local:5671     OK         HTTP       HTTP       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
-rabbitmq-internal.rabbitns.svc.cluster.local:5672     OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
-rabbitmq-internal.rabbitns.svc.cluster.local:9419     OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
-rabbitmq-internal.rabbitns.svc.cluster.local:15672    OK         mTLS       mTLS       rabbitmq-disable-mtls/rabbitns handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:5672     OK         mTLS       mTLS       default/rabbitns               handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:9419     OK         mTLS       mTLS       default/rabbitns               handler/javarabbitclient
+rabbitmq-internal.rabbitns.svc.cluster.local:15672    OK         mTLS       mTLS       default/rabbitns               handler/javarabbitclient
 ```
 which means both Server (policy) and Client (destination rule) are configured for mTLS for the 5671 port.
