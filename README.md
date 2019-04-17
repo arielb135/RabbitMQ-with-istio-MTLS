@@ -44,7 +44,7 @@ istio:
 ```
 * ingress part defines a record in the ingress gateway
 ## Exposing rabbitMQ UI in the ingress gateway
-Thankfully, istio gave us an istio gateway that can be used as the entry point if we want to go inside the cluster, we can terminate TLS there (to the outside world) for example.
+Thankfully, istio gave us an istio gateway that can be used as the entry point if we want to go inside the cluster, we have additional functionality using the gateway, for example - we can terminate TLS there (to the outside world) (not done here).
 
 ``` yaml
 apiVersion: networking.istio.io/v1alpha3
