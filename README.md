@@ -159,7 +159,7 @@ spec:
 * the full DNS of each pod (received from a kubernetes [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services)).
 * All ports that the service used need to be declared, so istio can register them.
 * The helm chart creates the list of hosts dynamically by replica count.
-
+* Not tested, but *.rabbitmq-discovery.rabbitns.svc.cluster.local might cover all pods (instead of creating it 1 by 1)
 
 ### more info:
 * general istio thread for stateful sets - https://github.com/istio/istio/issues/10659
